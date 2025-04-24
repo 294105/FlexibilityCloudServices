@@ -1,0 +1,29 @@
+<div class="p-4">
+  <h2 class="text-2xl font-bold mb-4">All Batches</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white p-4 shadow rounded">
+      <h4 class="font-semibold mb-2">Ongoing Batches</h4>
+      <ul>
+        <li *ngFor="let batch of ongoingBatches">
+          <strong>{{ batch.courseName }}</strong> - {{ batch.batchNumber }} - {{ batch.startDate | date }}
+        </li>
+      </ul>
+    </div>
+    <div class="bg-white p-4 shadow rounded">
+      <h4 class="font-semibold mb-2">Completed Batches</h4>
+      <ul>
+        <li *ngFor="let batch of completedBatches">
+          <strong>{{ batch.courseName }}</strong> - {{ batch.batchNumber }} - {{ batch.startDate | date }}
+        </li>
+      </ul>
+    </div>
+    <div class="bg-white p-4 shadow rounded">
+      <h4 class="font-semibold mb-2">Future Batches</h4>
+      <ul>
+        <li *ngFor="let batch of upcomingBatches">
+          <strong>{{ batch.courseName }}</strong> - {{ batch.batchNumber }} - {{ batch.startDate | date }}
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

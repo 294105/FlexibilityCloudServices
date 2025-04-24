@@ -1,0 +1,139 @@
+const mongoose = require('mongoose');
+require('./TrainingBatch'); // This registers the TrainingBatch schema with mongoose
+
+
+// Purchase Order Schema
+const purchaseOrderSchema = new mongoose.Schema({
+  courseName: {
+    type: String,
+    required: true
+  },
+  companyName: {
+    type: String,
+    required: true
+  },
+  trainerName: {
+    type: String,
+    required: true
+  },
+  startDate: {
+    type: Date,
+    required: true
+  },
+  numberOfDays: {
+    type: Number,
+    required: true
+  },
+  dailyCost: {
+    type: Number,
+    required: true
+  },
+  totalCost: {
+    type: Number,
+    default: 0
+  },
+  trainerCost: {
+    type: Number
+  }
+}, { timestamps: true });
+
+// Calculate the total cost before saving and update trainer salary
+purchaseOrderSchema.pre('save', async function (next) {
+  this.totalCost = this.numberOfDays * this.dailyCost; // Total cost based on days and daily cost
+  
+  // The trainerCost should be explicitly set in the request, which is used to update the salary
+  const trainerCost = this.trainerCost;
+
+  // Find the employee (trainer) to update salary
+  const Employee = mongoose.model('Employee');
+  const employee = await Employee.findOne({ name: this.trainerName });
+
+  if (employee) {
+    // Update employee salary by adding trainer cost
+    employee.salary += trainerCost;
+
+    // Save the updated employee
+    await employee.save();
+    console.log(`💰 Updated salary for ${employee.name}: ${employee.salary}`);
+  }
+
+  // Find the company to update financials
+  const Company = mongoose.model('Company');
+  const company = await Company.findOne();
+
+  if (company) {
+    // Update company finance summary
+    company.financeSummary.cumulativeRevenue += this.totalCost;
+    company.financeSummary.cumulativeCost += trainerCost; // Only consider trainerCost for salary payments
+    company.financeSummary.profit = company.financeSummary.cumulativeRevenue - company.financeSummary.cumulativeCost;
+
+    // Save company finance updates
+    await company.save();
+    console.log('🏦 Company Financials Updated');
+  }
+
+  next();
+});
+
+
+
+//***************************
+
+
+purchaseOrderSchema.pre('save', async function (next) {
+  this.totalCost = this.numberOfDays * this.dailyCost;
+  const trainerCost = this.trainerCost;
+
+  const Employee = mongoose.model('Employee');
+  const employee = await Employee.findOne({ name: this.trainerName });
+
+  if (employee) {
+    employee.salary += trainerCost;
+    await employee.save();
+  }
+
+  const Company = mongoose.model('Company');
+  const company = await Company.findOne();
+  if (company) {
+    company.financeSummary.cumulativeRevenue += this.totalCost;
+    company.financeSummary.cumulativeCost += trainerCost;
+    company.financeSummary.profit = company.financeSummary.cumulativeRevenue - company.financeSummary.cumulativeCost;
+    await company.save();
+  }
+
+  // Create TrainingBatch
+  const TrainingBatch = mongoose.model('TrainingBatch');
+  const existingBatch = await TrainingBatch.findOne({
+    courseName: this.courseName,
+    trainerName: this.trainerName,
+    startDate: this.startDate
+  });
+
+  if (!existingBatch) {
+    const endDate = new Date(this.startDate);
+    endDate.setDate(endDate.getDate() + this.numberOfDays);
+    const batchNumber = `BATCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    await TrainingBatch.create({
+      courseName: this.courseName,
+      trainerName: this.trainerName,
+      batchNumber,
+      startDate: this.startDate,
+      endDate
+    });
+
+    console.log(`📚 TrainingBatch created: ${batchNumber}`);
+  }
+
+  next();
+});
+
+
+
+
+
+
+
+
+const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
+module.exports = PurchaseOrder;

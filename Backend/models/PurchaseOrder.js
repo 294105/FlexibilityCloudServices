@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 require('./TrainingBatch'); // This registers the TrainingBatch schema with mongoose
 
-
 // Purchase Order Schema
 const purchaseOrderSchema = new mongoose.Schema({
   courseName: {
@@ -37,103 +36,86 @@ const purchaseOrderSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Calculate the total cost before saving and update trainer salary
+// Consolidated pre('save') hook
 purchaseOrderSchema.pre('save', async function (next) {
-  this.totalCost = this.numberOfDays * this.dailyCost; // Total cost based on days and daily cost
-  
-  // The trainerCost should be explicitly set in the request, which is used to update the salary
-  const trainerCost = this.trainerCost;
+  try {
+    this.totalCost = this.numberOfDays * this.dailyCost;
+    const trainerCost = this.trainerCost;
 
-  // Find the employee (trainer) to update salary
-  const Employee = mongoose.model('Employee');
-  const employee = await Employee.findOne({ name: this.trainerName });
+    // Find the employee (trainer) to update salary
+    const Employee = mongoose.model('Employee');
+    const employee = await Employee.findOne({ name: this.trainerName });
 
-  if (employee) {
-    // Update employee salary by adding trainer cost
-    employee.salary += trainerCost;
+    console.log('Employee found:', employee); // Debugging log
 
-    // Save the updated employee
-    await employee.save();
-    console.log(`💰 Updated salary for ${employee.name}: ${employee.salary}`);
-  }
+    if (employee) {
+      // Update employee salary by adding trainer cost
+      employee.salary += trainerCost;
+      await employee.save();
+      console.log(`💰 Updated salary for ${employee.name}: ${employee.salary}`);
 
-  // Find the company to update financials
-  const Company = mongoose.model('Company');
-  const company = await Company.findOne();
+      // Generate salary slip for the employee
+      const month = new Date(this.startDate).toLocaleString('default', { month: 'long', year: 'numeric' });
+      const SalarySlip = mongoose.model('SalarySlip');
 
-  if (company) {
-    // Update company finance summary
-    company.financeSummary.cumulativeRevenue += this.totalCost;
-    company.financeSummary.cumulativeCost += trainerCost; // Only consider trainerCost for salary payments
-    company.financeSummary.profit = company.financeSummary.cumulativeRevenue - company.financeSummary.cumulativeCost;
+      // Debugging log before creating the salary slip
+      console.log(`Creating salary slip for ${employee.name} - Month: ${month}, Trainer Cost: ${trainerCost}`);
 
-    // Save company finance updates
-    await company.save();
-    console.log('🏦 Company Financials Updated');
-  }
+      const salarySlip = await SalarySlip.create({
+        employeeId: employee._id,
+        employeeName: employee.name,
+        trainerCost,
+        month,
+        bankDetails: employee.trainerBankDetails
+      });
 
-  next();
-});
+      console.log(`🧾 Salary slip generated for ${employee.name} - ${month}:`, salarySlip);
+    } else {
+      console.log(`Employee not found for trainerName: ${this.trainerName}`);
+    }
 
+    // Find and update the company financials
+    const Company = mongoose.model('Company');
+    const company = await Company.findOne();
 
+    if (company) {
+      company.financeSummary.cumulativeRevenue += this.totalCost;
+      company.financeSummary.cumulativeCost += trainerCost;
+      company.financeSummary.profit = company.financeSummary.cumulativeRevenue - company.financeSummary.cumulativeCost;
+      await company.save();
+      console.log('🏦 Company Financials Updated');
+    }
 
-//***************************
-
-
-purchaseOrderSchema.pre('save', async function (next) {
-  this.totalCost = this.numberOfDays * this.dailyCost;
-  const trainerCost = this.trainerCost;
-
-  const Employee = mongoose.model('Employee');
-  const employee = await Employee.findOne({ name: this.trainerName });
-
-  if (employee) {
-    employee.salary += trainerCost;
-    await employee.save();
-  }
-
-  const Company = mongoose.model('Company');
-  const company = await Company.findOne();
-  if (company) {
-    company.financeSummary.cumulativeRevenue += this.totalCost;
-    company.financeSummary.cumulativeCost += trainerCost;
-    company.financeSummary.profit = company.financeSummary.cumulativeRevenue - company.financeSummary.cumulativeCost;
-    await company.save();
-  }
-
-  // Create TrainingBatch
-  const TrainingBatch = mongoose.model('TrainingBatch');
-  const existingBatch = await TrainingBatch.findOne({
-    courseName: this.courseName,
-    trainerName: this.trainerName,
-    startDate: this.startDate
-  });
-
-  if (!existingBatch) {
-    const endDate = new Date(this.startDate);
-    endDate.setDate(endDate.getDate() + this.numberOfDays);
-    const batchNumber = `BATCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    await TrainingBatch.create({
+    // Create the TrainingBatch if it doesn't exist
+    const TrainingBatch = mongoose.model('TrainingBatch');
+    const existingBatch = await TrainingBatch.findOne({
       courseName: this.courseName,
       trainerName: this.trainerName,
-      batchNumber,
-      startDate: this.startDate,
-      endDate
+      startDate: this.startDate
     });
 
-    console.log(`📚 TrainingBatch created: ${batchNumber}`);
+    if (!existingBatch) {
+      const endDate = new Date(this.startDate);
+      endDate.setDate(endDate.getDate() + this.numberOfDays);
+      const batchNumber = `BATCH-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      await TrainingBatch.create({
+        courseName: this.courseName,
+        trainerName: this.trainerName,
+        batchNumber,
+        startDate: this.startDate,
+        endDate
+      });
+
+      console.log(`📚 TrainingBatch created: ${batchNumber}`);
+    }
+
+    next(); // Call next() to continue with saving the Purchase Order
+  } catch (error) {
+    console.log('Error in pre-save hook:', error);
+    next(error); // Proper error handling
   }
-
-  next();
 });
-
-
-
-
-
-
-
 
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 module.exports = PurchaseOrder;

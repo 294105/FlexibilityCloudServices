@@ -9,6 +9,8 @@ const Employee = require('./models/Employee');
 const Company = require('./models/Company');
 const { autoPaySalaries } = require('./controllers/salaryController');
 const trainingBatchRoutes = require('./routes/trainingBatch');
+const employeeInvoiceRoutes = require('./routes/employeeInvoiceRoutes');
+
 
 
 dotenv.config();
@@ -24,7 +26,11 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
+const salarySlipRoutes = require('./routes/salarySlipRoutes');
+app.use('/api/salary-slips', salarySlipRoutes);
+
 app.use('/api/batches', trainingBatchRoutes);
+app.use('/api/employee-invoices', employeeInvoiceRoutes);
 const authRoutes = require('./routes/auth.routes');
 const protectedRoutes = require('./routes/protected.routes');
 const financeRoutes = require('./routes/finance');

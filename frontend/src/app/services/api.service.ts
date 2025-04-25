@@ -40,6 +40,10 @@ getFinanceDetails(): Observable<{
   getInvoices(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/invoices`); // Simplified route
   }
+  getEmployeeInvoices(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/employee-invoices/all`);
+  }
+
 
   // Pay salary to a specific employee
   paySalary(empId: string): Observable<any> {
